@@ -75,19 +75,16 @@
 //! There are also variants that allow fallibly constructing an array, via [`build_array_result`]
 //! or [`build_array_option`], similar to [`UnarrayArrayExt::map_result`] and [`UnarrayArrayExt::map_option`]
 
-#![deny(clippy::missing_safety_doc)]
+#![deny(clippy::missing_safety_doc, missing_docs)]
 use std::mem::MaybeUninit;
 
 mod build;
 mod map;
+#[cfg(test)]
+mod tests;
 
 pub use build::{build_array, build_array_option, build_array_result};
 pub use map::UnarrayArrayExt;
-
-#[cfg(test)]
-mod proptests;
-#[cfg(test)]
-mod tests;
 
 /// Convert a `[MaybeUninit<T>; N]` to a `[T; N]`
 ///

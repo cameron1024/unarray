@@ -1,5 +1,3 @@
-use std::mem::MaybeUninit;
-
 use crate::{mark_initialized, uninit_buf};
 
 /// An extension trait that adds methods to `[T; N]`
