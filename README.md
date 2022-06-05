@@ -1,6 +1,7 @@
 # Unarray
 
 [![Docs badge]][docs.rs]
+[![crates badge]][crates.io]
 
 Utilities for working with uninitialized arrays
 
@@ -98,3 +99,5 @@ dual licensed as above, without any additional terms or conditions.
 
 [Docs badge]: https://img.shields.io/badge/docs.rs-rustdoc-green
 [docs.rs]: https://docs.rs/unarray/
+[crates badge]: https://img.shields.io/crates/d/unarray
+[crates.io]: https://crates.io/crates/unarray
