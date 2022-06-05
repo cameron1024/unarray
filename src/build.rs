@@ -85,4 +85,10 @@ mod tests {
         let array = build_array_option(|i| Some(i * 2));
         assert_eq!(array, Some([0, 2, 4]));
     }
+
+    #[test]
+    fn test_build_array_result() {
+        let array = build_array_result(|i| Ok::<usize, ()>(i * 2));
+        assert_eq!(array, Ok([0, 2, 4]));
+    }
 }

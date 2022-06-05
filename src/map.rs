@@ -61,13 +61,6 @@ impl<T, const N: usize> UnarrayArrayExt<T, N> for [T; N] {
             };
         }
 
-        #[cfg(test)]
-        {
-            debug_assert_eq!(
-                std::mem::size_of::<[MaybeUninit<S>; N]>(),
-                std::mem::size_of::<[S; N]>()
-            );
-        }
         // SAFETY:
         // At this point in execution, we have iterated over all elements of `result`. If any
         // errors were encountered, we would have already returned. So it's safe to remove the
@@ -90,6 +83,9 @@ impl<T, const N: usize> UnarrayArrayExt<T, N> for [T; N] {
 #[cfg(test)]
 mod tests {
     use super::UnarrayArrayExt;
+    use crate::testing::array_strategy;
+    use proptest::prelude::*;
+    use test_strategy::proptest;
 
     #[test]
     fn test_map_option() {
@@ -130,24 +126,12 @@ mod tests {
             Ok(i)
         });
     }
-}
-
-#[cfg(test)]
-mod proptests {
-    use proptest::collection::vec;
-    use proptest::prelude::*;
-    use test_strategy::proptest;
-
-    use crate::UnarrayArrayExt;
 
     const LEN: usize = 100;
 
-    fn array_strategy() -> impl Strategy<Value = [String; LEN]> {
-        vec(any::<String>(), LEN).prop_map(|v| v.try_into().unwrap())
-    }
-
     #[proptest]
-    fn proptest_option_map(#[strategy(array_strategy())] array: [String; LEN]) {
+    #[cfg_attr(miri, ignore)]
+    fn proptest_option_map(#[strategy(array_strategy::<LEN>())] array: [String; LEN]) {
         let expected = array.iter().map(|s| s.len()).collect::<Vec<_>>();
         let expected: [usize; LEN] = expected.try_into().unwrap();
         let result = array.map_option(|s| Some(s.len()));
@@ -155,7 +139,8 @@ mod proptests {
     }
 
     #[proptest]
-    fn proptest_result_map(#[strategy(array_strategy())] array: [String; LEN]) {
+    #[cfg_attr(miri, ignore)]
+    fn proptest_result_map(#[strategy(array_strategy::<LEN>())] array: [String; LEN]) {
         let expected = array.iter().map(|s| s.len()).collect::<Vec<_>>();
         let expected: [usize; LEN] = expected.try_into().unwrap();
         let result: Result<_, ()> = array.map_result(|s| Ok(s.len()));

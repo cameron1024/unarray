@@ -2,6 +2,8 @@
 //!
 //! Helper utilities for working with arrays of uninitialized memory.
 //!
+//! ## Current stable Rust
+//!
 //! Creating arrays in Rust can be somewhat painful. Currently, your best option in the general
 //! case is to allocate your elements in a `Vec`, then convert to an array:
 //! ```
@@ -20,8 +22,10 @@
 //! also incurrs an unnecessary initialization cost. Why set each element to `0`, then set it
 //! again, when you could just set it once?
 //!
+//! ## `uninit_buf` and `mark_initialized`
+//!
 //! The lowest-level tools provided by this library are the pair of functions: [`uninit_buf`] and
-//! [`mark_initialized`]. These are ergonomic wrappers around the [`std::mem::MaybeUninit`] type.
+//! [`mark_initialized`]. These are ergonomic wrappers around the [`core::mem::MaybeUninit`] type.
 //! Roughly speaking, most uses of these functions will follow the following steps:
 //!  - Stack-allocate a region of uninitialized memory with [`uninit_buf`]
 //!  - Initialize each element
@@ -39,20 +43,18 @@
 //! let result = unsafe { mark_initialized(buffer) };
 //! assert_eq!(result, [123; 1000]);
 //! ```
-//! These functions closely map onto tools provided by [`std::mem::MaybeUninit`], so should feel
+//! These functions closely map onto tools provided by [`core::mem::MaybeUninit`], so should feel
 //! familiar. However, [`mark_initialized`] is an unsafe function, since it's possible to create
 //! uninitialized values that aren't wrapped in `MaybeUninit`. It's up to the programmer to make
 //! sure every element has been initialized before calling [`mark_initialized`], otherwise it's UB.
 //!
 //! For this, there are also fully safe APIs that cover some of the common patterns via an
 //! extension trait on `[T; N]`:
+//!
+//! ## `UnarrayArrayExt` extension trait
+//!
 //! ```
 //! # use unarray::*;
-//! // mapping an array
-//! let numbers = [1, 2, 3];
-//! let doubled = numbers.map(|i| i * 2);
-//! assert_eq!(doubled, [2, 4, 6]);
-//!
 //! // mapping an array via a `Result`
 //! let strings = ["123", "234"];
 //! let numbers = strings.map_result(|s| s.parse());
@@ -64,6 +66,32 @@
 //! ```
 //! There is also `map_option` for functions which return an `Option`
 //!
+//! ## Collecting iterators
+//!
+//! Iterators generally don't know their length at compile time. But it's often the case that the
+//! programmer knows the length ahead of time. In cases like this, it's common to want to collect
+//! these elements into an array, without heap allocation or initializing default elements.
+//!
+//! Arrays don't implement `FromIterator` for this very reason. So this library provides
+//! `ArrayFromIter`:
+//! ```
+//! # use unarray::*;
+//! let iter = [1, 2, 3].into_iter().map(|i| i * 2);
+//! let ArrayFromIter(array) = iter.collect();  // inferred to be `ArrayFromIter::<i32, 3>`
+//! assert_eq!(array, Some([2, 4, 6]));
+//! ```
+//! However, this can fail, since the iterator may not actually yield the right number of elements.
+//! In these cases, the inner option is `None`:
+//! ```
+//! # use unarray::*;
+//! let iter = [1, 2, 3, 4].into_iter();
+//! match iter.collect() {
+//!   ArrayFromIter(Some([a, b, c])) => println!("3 elements, {a}, {b}, {c}"),
+//!   ArrayFromIter(None) => println!("not 3 elements"),
+//! }
+//! ```
+//! ## `build_array-*` functions
+//!
 //! Finally, it's often the case that you want to initialize each array element based on its index.
 //! For that, [`build_array`] takes a const generic length, and a function that takes an index and
 //! returns an element, and builds the array for you:
@@ -73,18 +101,21 @@
 //! assert_eq!(array, [0, 2, 4, 6, 8]);
 //! ```
 //! There are also variants that allow fallibly constructing an array, via [`build_array_result`]
-//! or [`build_array_option`], similar to [`UnarrayArrayExt::map_result`] and [`UnarrayArrayExt::map_option`]
+//! or [`build_array_option`], similar to [`UnarrayArrayExt::map_result`] and [`UnarrayArrayExt::map_option`].
 
+#![cfg_attr(not(test), no_std)]
 #![deny(clippy::missing_safety_doc, missing_docs)]
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 mod build;
 mod map;
+mod from_iter;
 #[cfg(test)]
-mod tests;
+mod testing;
 
 pub use build::{build_array, build_array_option, build_array_result};
 pub use map::UnarrayArrayExt;
+pub use from_iter::ArrayFromIter;
 
 /// Convert a `[MaybeUninit<T>; N]` to a `[T; N]`
 ///
@@ -100,13 +131,13 @@ pub use map::UnarrayArrayExt;
 /// assert_eq!(result, [123; 1000])
 /// ```
 ///
-/// This largely acts as a workaround to the fact that [`std::mem::transmute`] cannot be used with
+/// This largely acts as a workaround to the fact that [`core::mem::transmute`] cannot be used with
 /// const generic arrays, as it can't prove they have the same size (even when intuitively they are
 /// the same, e.g. `[i32; N]` and `[u32; N]`).
 ///
 /// # Safety
 ///
-/// Internally, this uses [`std::mem::transmute_copy`] to convert a `[MaybeUninit<T>; N]` to `[T; N]`.
+/// Internally, this uses [`core::mem::transmute_copy`] to convert a `[MaybeUninit<T>; N]` to `[T; N]`.
 /// As such, you must make sure every element has been initialized before calling this function. If
 /// there are uninitialized elements in `src`, these will be converted to `T`s, which is UB. For
 /// example:
@@ -120,7 +151,7 @@ pub use map::UnarrayArrayExt;
 /// }
 /// ```
 /// Even if you never use a value, it's still UB. This is especially true for types with
-/// [`std::ops::Drop`] implementations:
+/// [`core::ops::Drop`] implementations:
 /// ```no_run
 /// # use unarray::*;
 /// // ⚠️ This example produces UB ⚠️
@@ -130,7 +161,7 @@ pub use map::UnarrayArrayExt;
 /// // uh_oh is dropped here, freeing memory at random addresses
 /// ```
 pub unsafe fn mark_initialized<T, const N: usize>(src: [MaybeUninit<T>; N]) -> [T; N] {
-    std::mem::transmute_copy::<[MaybeUninit<T>; N], [T; N]>(&src)
+    core::mem::transmute_copy::<[MaybeUninit<T>; N], [T; N]>(&src)
 }
 
 /// Create an array of unintialized memory
