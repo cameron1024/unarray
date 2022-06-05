@@ -2,6 +2,8 @@
 
 [![Docs badge]][docs.rs]
 [![crates badge]][crates.io]
+[![github badge]][github]
+[![license badge]][github]
 
 Utilities for working with uninitialized arrays
 
@@ -99,5 +101,8 @@ dual licensed as above, without any additional terms or conditions.
 
 [Docs badge]: https://img.shields.io/badge/docs.rs-rustdoc-green
 [docs.rs]: https://docs.rs/unarray/
-[crates badge]: https://img.shields.io/crates/d/unarray
+[crates badge]: https://img.shields.io/crates/v/unarray
 [crates.io]: https://crates.io/crates/unarray
+[license badge]: https://img.shields.io/crates/l/unarray
+[github badge]: https://img.shields.io/github/checks-status/cameron1024/unarray/master
+[github]: https://github.com/cameron1024/unarray
