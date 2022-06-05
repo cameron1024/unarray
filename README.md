@@ -7,6 +7,10 @@
 
 Utilities for working with uninitialized arrays
 
+ - No dependencies
+ - `#[no_std]`
+ - No panics (all APIs return `Result` or `Option`)
+
 This crate provides a few sets of APIs:
 
 ### `uninit_buf` and `mark_initialized`
