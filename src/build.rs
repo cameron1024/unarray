@@ -7,6 +7,9 @@ use crate::{mark_initialized, uninit_buf};
 /// let array: [usize; 5] = build_array(|i| i * 2);
 /// assert_eq!(array, [0, 2, 4, 6, 8]);
 /// ```
+/// If `f` panics, any already-initialized elements will be dropped **without** running their
+/// `Drop` implmentations, potentially creating resource leaks. Note that this is still "safe",
+/// since Rust's notion of "safety" doesn't guarantee destructors are run.
 ///
 /// For builder functions which might fail, consider using [`build_array_result`] or
 /// [`build_array_option`]
@@ -33,6 +36,12 @@ pub fn build_array<T, const N: usize, F: FnMut(usize) -> T>(mut f: F) -> [T; N] 
 /// let success: Result<_, ()> = build_array_result(|i| Ok(i * 2));
 /// assert_eq!(success, Ok([0, 2, 4]));
 /// ```
+///
+/// If `f` panics, any already-initialized elements will be dropped **without** running their
+/// `Drop` implmentations, potentially creating resource leaks. Note that this is still "safe",
+/// since Rust's notion of "safety" doesn't guarantee destructors are run.
+///
+/// This is similar to the nightly-only [`core::array::try_from_fn`]
 pub fn build_array_result<T, E, const N: usize, F: FnMut(usize) -> Result<T, E>>(
     mut f: F,
 ) -> Result<[T; N], E> {
@@ -59,6 +68,12 @@ pub fn build_array_result<T, E, const N: usize, F: FnMut(usize) -> Result<T, E>>
 /// let success = build_array_option(|i| Some(i * 2));
 /// assert_eq!(success, Some([0, 2, 4]));
 /// ```
+///
+/// If `f` panics, any already-initialized elements will be dropped **without** running their
+/// `Drop` implmentations, potentially creating resource leaks. Note that this is still "safe",
+/// since Rust's notion of "safety" doesn't guarantee destructors are run.
+///
+/// This is similar to the nightly-only [`core::array::try_from_fn`]
 pub fn build_array_option<T, const N: usize, F: FnMut(usize) -> Option<T>>(
     mut f: F,
 ) -> Option<[T; N]> {

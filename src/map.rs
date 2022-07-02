@@ -1,6 +1,9 @@
 use crate::{mark_initialized, uninit_buf};
 
 /// An extension trait that adds methods to `[T; N]`
+///
+/// This trait provides [`UnarrayArrayExt::map_result`] and [`UnarrayArrayExt::map_option`], 
+/// which provide functionality similar to the nightly-only [`array::try_map`]
 pub trait UnarrayArrayExt<T, const N: usize> {
     /// Maps an array, short-circuiting if any element produces an `Err`
     ///

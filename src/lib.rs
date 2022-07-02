@@ -135,6 +135,8 @@ pub use from_iter::ArrayFromIter;
 /// const generic arrays, as it can't prove they have the same size (even when intuitively they are
 /// the same, e.g. `[i32; N]` and `[u32; N]`).
 ///
+/// This is similar to the nightly-only [`core::mem::MaybeUninit::array_assume_init`]
+///
 /// # Safety
 ///
 /// Internally, this uses [`core::mem::transmute_copy`] to convert a `[MaybeUninit<T>; N]` to `[T; N]`.
@@ -181,6 +183,8 @@ pub unsafe fn mark_initialized<T, const N: usize>(src: [MaybeUninit<T>; N]) -> [
 /// let result = unsafe { mark_initialized(buffer) };
 /// assert_eq!(result, [123; 1000])
 /// ```
+///
+/// This is similar to the nightly-only [`core::mem::MaybeUninit::uninit_array`]
 pub fn uninit_buf<T, const N: usize>() -> [MaybeUninit<T>; N] {
     // SAFETY:
     // This is safe because we are assuming that a `[MaybeUninit<T>; N]` is initialized. However,
