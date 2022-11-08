@@ -1,10 +1,11 @@
+use core::iter::FromIterator;
 use crate::{mark_initialized, uninit_buf};
 
 /// A wrapper type to collect an [`Iterator`] into an array
 ///
 /// ```
 /// # use unarray::*;
-/// let iter = [1, 2, 3].into_iter();
+/// let iter = vec![1, 2, 3].into_iter();
 /// let ArrayFromIter(array) = iter.collect();
 ///
 /// assert_eq!(array, Some([1, 2, 3]));
@@ -14,11 +15,11 @@ use crate::{mark_initialized, uninit_buf};
 /// iterator doesn't yield **exactly** `N` elements:
 /// ```
 /// use unarray::*;
-/// let too_many = [1, 2, 3, 4].into_iter();
+/// let too_many = vec![1, 2, 3, 4].into_iter();
 /// let ArrayFromIter::<i32, 3>(option) = too_many.collect();
 /// assert!(option.is_none());
 ///
-/// let too_few = [1, 2].into_iter();
+/// let too_few = vec![1, 2].into_iter();
 /// let ArrayFromIter::<i32, 3>(option) = too_few.collect();
 /// assert!(option.is_none());
 /// ```
@@ -51,6 +52,8 @@ impl<T, const N: usize> FromIterator<T> for ArrayFromIter<T, N> {
 #[cfg(test)]
 mod tests {
 
+    use core::convert::TryInto;
+
     use crate::testing::vec_strategy;
     use proptest::{prop_assert, prop_assert_eq};
     use test_strategy::proptest;
@@ -59,7 +62,7 @@ mod tests {
 
     #[test]
     fn can_collect_array_from_iter() {
-        let iter = [1, 2, 3].into_iter();
+        let iter = vec![1, 2, 3].into_iter();
 
         let ArrayFromIter(array) = iter.collect();
         assert_eq!(array.unwrap(), [1, 2, 3]);
@@ -67,11 +70,11 @@ mod tests {
 
     #[test]
     fn fails_if_incorrect_number_of_elements() {
-        let iter = [1, 2, 3].into_iter();
+        let iter = [1, 2, 3].iter();
         let ArrayFromIter::<_, 4>(array) = iter.collect();
         assert!(array.is_none());
 
-        let iter = [1, 2, 3].into_iter();
+        let iter = [1, 2, 3].iter();
         let ArrayFromIter::<_, 2>(array) = iter.collect();
         assert!(array.is_none());
     }

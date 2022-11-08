@@ -7,6 +7,7 @@
 //! Creating arrays in Rust can be somewhat painful. Currently, your best option in the general
 //! case is to allocate your elements in a `Vec`, then convert to an array:
 //! ```
+//! # use core::convert::TryInto;
 //! const LEN: usize = 1000;
 //! let mut elements = Vec::with_capacity(LEN);  // heap allocation here
 //!

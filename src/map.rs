@@ -2,7 +2,7 @@ use crate::{mark_initialized, uninit_buf};
 
 /// An extension trait that adds methods to `[T; N]`
 ///
-/// This trait provides [`UnarrayArrayExt::map_result`] and [`UnarrayArrayExt::map_option`], 
+/// This trait provides [`UnarrayArrayExt::map_result`] and [`UnarrayArrayExt::map_option`],
 /// which provide functionality similar to the nightly-only [`array::try_map`]
 pub trait UnarrayArrayExt<T, const N: usize> {
     /// Maps an array, short-circuiting if any element produces an `Err`
@@ -57,7 +57,7 @@ impl<T, const N: usize> UnarrayArrayExt<T, N> for [T; N] {
         // This is quaranteed to loop over every element (or panic), since both `result` and `self` have N elements
         // If a panic occurs, uninitialized data is never dropped, since `MaybeUninit` wraps its
         // contained data in `ManuallyDrop`
-        for (item, slot) in self.into_iter().zip(&mut result) {
+        for (item, slot) in IntoIterator::into_iter(self).zip(&mut result) {
             match f(item) {
                 Ok(s) => slot.write(s),
                 Err(e) => return Err(e),
@@ -85,6 +85,8 @@ impl<T, const N: usize> UnarrayArrayExt<T, N> for [T; N] {
 
 #[cfg(test)]
 mod tests {
+    use core::convert::TryInto;
+
     use super::UnarrayArrayExt;
     use crate::testing::array_strategy;
     use proptest::prelude::*;
