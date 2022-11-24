@@ -57,10 +57,19 @@ impl<T, const N: usize> UnarrayArrayExt<T, N> for [T; N] {
         // This is quaranteed to loop over every element (or panic), since both `result` and `self` have N elements
         // If a panic occurs, uninitialized data is never dropped, since `MaybeUninit` wraps its
         // contained data in `ManuallyDrop`
-        for (item, slot) in IntoIterator::into_iter(self).zip(&mut result) {
+        for (index, (item, slot)) in IntoIterator::into_iter(self).zip(&mut result).enumerate() {
             match f(item) {
                 Ok(s) => slot.write(s),
-                Err(e) => return Err(e),
+                Err(e) => {
+                    // SAFETY:
+                    // We have failed at `index` which is the `index + 1`th element, so the first
+                    // `index` elements are safe to drop
+                    result
+                        .iter_mut()
+                        .take(index)
+                        .for_each(|slot| unsafe { slot.assume_init_drop() });
+                    return Err(e);
+                }
             };
         }
 
@@ -85,7 +94,10 @@ impl<T, const N: usize> UnarrayArrayExt<T, N> for [T; N] {
 
 #[cfg(test)]
 mod tests {
-    use core::convert::TryInto;
+    use core::{
+        convert::TryInto,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     use super::UnarrayArrayExt;
     use crate::testing::array_strategy;
@@ -130,6 +142,47 @@ mod tests {
 
             Ok(i)
         });
+    }
+
+    struct IncrementOnDrop<'a>(&'a AtomicUsize);
+    impl Drop for IncrementOnDrop<'_> {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    fn map_array_result_doesnt_leak() {
+        let drop_counter = 0.into();
+
+        // this will successfully create 3 structs, fail on the 4th, we expect 3 drops to be
+        // called, since the 4th may be in an inconsistent state
+        let _ = [0, 1, 2, 3, 4].map_result(|i| {
+            if i == 3 {
+                Err(())
+            } else {
+                Ok(IncrementOnDrop(&drop_counter))
+            }
+        });
+
+        assert_eq!(drop_counter.load(Ordering::Relaxed), 3);
+    }
+
+    #[test]
+    fn map_array_option_doesnt_leak() {
+        let drop_counter = 0.into();
+
+        // this will successfully create 3 structs, fail on the 4th, we expect 3 drops to be
+        // called, since the 4th may be in an inconsistent state
+        let _ = [0, 1, 2, 3, 4].map_option(|i| {
+            if i == 3 {
+                None
+            } else {
+                Some(IncrementOnDrop(&drop_counter))
+            }
+        });
+
+        assert_eq!(drop_counter.load(Ordering::Relaxed), 3);
     }
 
     const LEN: usize = 100;
