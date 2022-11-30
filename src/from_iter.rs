@@ -1,5 +1,5 @@
-use core::iter::FromIterator;
 use crate::{mark_initialized, uninit_buf};
+use core::iter::FromIterator;
 
 /// A wrapper type to collect an [`Iterator`] into an array
 ///
@@ -30,15 +30,29 @@ impl<T, const N: usize> FromIterator<T> for ArrayFromIter<T, N> {
         let mut buffer = uninit_buf::<T, N>();
         let mut iter = iter.into_iter();
         let mut buf_iter = buffer.iter_mut();
+        let mut num_written = 0;
 
         loop {
             let item = iter.next();
             let slot = buf_iter.next();
 
             match (item, slot) {
-                (Some(item), Some(slot)) => slot.write(item),
-                (Some(_), None) => return Self(None),
-                (None, Some(_)) => return Self(None),
+                (Some(item), Some(slot)) => {
+                    num_written += 1;
+                    slot.write(item);
+                }
+                // error case, we should free the previous ones and continue
+                (Some(_), None) | (None, Some(_)) => {
+                    // SAFETY:
+                    // There are `num_written` elements fully initialized, so we can safely drop
+                    // them
+                    buffer
+                        .iter_mut()
+                        .take(num_written)
+                        .for_each(|slot| unsafe { slot.assume_init_drop() });
+
+                    return Self(None);
+                }
                 // SAFETY
                 // If this is reached, every prior iteration of the loop has matched
                 // (Some(_), Some(_)). As such, both iterators have yielded the same number of
@@ -52,7 +66,10 @@ impl<T, const N: usize> FromIterator<T> for ArrayFromIter<T, N> {
 #[cfg(test)]
 mod tests {
 
-    use core::convert::TryInto;
+    use core::{
+        convert::TryInto,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     use crate::testing::vec_strategy;
     use proptest::{prop_assert, prop_assert_eq};
@@ -83,6 +100,30 @@ mod tests {
     const SHORT_LEN: usize = LEN - 1;
     const LONG_LEN: usize = LEN + 1;
 
+    #[derive(Clone)]
+    struct IncrementOnDrop<'a>(&'a AtomicUsize);
+    impl Drop for IncrementOnDrop<'_> {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    fn doesnt_leak_too_long() {
+        let drop_count = 0.into();
+        let ArrayFromIter::<_, 3>(_) = vec![IncrementOnDrop(&drop_count); 4].into_iter().collect();
+        // since it failed, all 4 should be dropped
+        assert_eq!(drop_count.load(Ordering::Relaxed), 4);
+    }
+
+    #[test]
+    fn doesnt_leak_too_short() {
+        let drop_count = 0.into();
+        let ArrayFromIter::<_, 3>(_) = vec![IncrementOnDrop(&drop_count); 2].into_iter().collect();
+        // since it failed, both should be dropped
+        assert_eq!(drop_count.load(Ordering::Relaxed), 2);
+    }
+
     #[proptest]
     #[cfg_attr(miri, ignore)]
     fn undersized_proptest(#[strategy(vec_strategy(LEN))] vec: Vec<String>) {
@@ -105,5 +146,3 @@ mod tests {
         prop_assert_eq!(array.unwrap(), expected);
     }
 }
-
-
